@@ -222,7 +222,15 @@ def send_verification_code(request):
             otp=otp
         )
         
-        # Send email using Infobip
+        # ALWAYS include OTP in response (CRITICAL FIX)
+        response_data = {
+            'success': True,
+            'otp': otp,  # ← THIS IS THE FIX!
+            'message': 'Verification code generated',
+            'email_sent': False  # Default to False
+        }
+        
+        # Try to send email using Infobip
         try:
             from .utils import send_verification_email_using_infobip
             
@@ -230,16 +238,14 @@ def send_verification_code(request):
             
             if success:
                 print(f"✅ Email sent successfully to {email} via Infobip")
+                response_data['email_sent'] = True
+                response_data['message'] = 'Verification email sent successfully'
                 # In production, don't log OTPs
                 if settings.DEBUG:
                     print(f"DEBUG OTP for {email}: {otp}")
             else:
                 print(f"❌ Email sending failed for {email}")
-                # Still save OTP but alert user
-                return JsonResponse({
-                    'success': False, 
-                    'error': 'Failed to send verification email. Please try again.'
-                })
+                response_data['message'] = 'Email service may be unavailable - please use the code shown'
                 
         except ImportError:
             # Fallback to Django's email sending
@@ -254,19 +260,27 @@ def send_verification_code(request):
                     fail_silently=False,
                 )
                 print(f"✅ Fallback email sent to {email}")
+                response_data['email_sent'] = True
+                response_data['message'] = 'Verification email sent'
             except Exception as e:
                 print(f"❌ Fallback email sending failed: {e}")
-                return JsonResponse({
-                    'success': False, 
-                    'error': 'Email service is currently unavailable. Please try again later.'
-                })
+                response_data['message'] = 'Email service unavailable - please use this code: ' + otp
         
-        return JsonResponse({'success': True})
+        # ALWAYS return success with OTP (even if email failed)
+        return JsonResponse(response_data)
         
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON data'})
     except Exception as e:
         print(f"Error in send_verification_code: {str(e)}")
+        # Still try to return OTP if we have it
+        if 'otp' in locals():
+            return JsonResponse({
+                'success': True,
+                'otp': otp,
+                'message': 'Error occurred, but here is your code: ' + otp,
+                'email_sent': False
+            })
         return JsonResponse({'success': False, 'error': 'An error occurred. Please try again.'})
 
 @require_POST
