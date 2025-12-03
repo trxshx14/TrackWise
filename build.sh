@@ -10,6 +10,3 @@ python manage.py collectstatic --no-input
 
 # Apply database migrations
 python manage.py migrate
-
-C:\Users\User\Documents\TrackWise FINAL\TrackWise\build.sh
-C:\Users\User\Documents\TrackWise FINAL\TrackWise\manage.py
