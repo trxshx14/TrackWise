@@ -17,14 +17,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-l*y9*la5o2t-cx6utb=w9ty9keswzzhf_uw2-5s9m_+!2gq$ev')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "trackwise-7hg9.onrender.com",
     ".onrender.com"  # Allow all Render subdomains
+]
+
+# CSRF protection for Render
+CSRF_TRUSTED_ORIGINS = [
+    'https://trackwise-7hg9.onrender.com',
+    'https://*.onrender.com',
 ]
 
 # Application definition
@@ -115,9 +120,8 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
 
-# Only use Whitenoise in production
-if not DEBUG:
-    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# WhiteNoise for static files
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -128,17 +132,20 @@ LOGOUT_REDIRECT_URL = 'accounts:login'
 LOGIN_URL = 'accounts:login'
 
 # ============================================
-# EMAIL CONFIGURATION - GMail SMTP (WORKS NOW!)
+# EMAIL CONFIGURATION - GMail SMTP (FIXED)
 # ============================================
 
-# Get email credentials from environment or use defaults
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'cararagtrisharaye@gmail.com')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')  # Your 16-char app password
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'TrackWise <cararagtrisharaye@gmail.com>')
+# Get email credentials from environment
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'TrackWise <noreply@trackwise.com>')
+
+# Determine if we're on Render
+is_render = 'RENDER' in os.environ
 
 # Check if we have email credentials
 if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
-    # PRODUCTION: Gmail SMTP Configuration
+    # Gmail SMTP Configuration
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = 'smtp.gmail.com'
     EMAIL_PORT = 587
@@ -146,22 +153,18 @@ if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
     EMAIL_USE_SSL = False
     SERVER_EMAIL = DEFAULT_FROM_EMAIL
     
-    print("✅ USING GMAIL SMTP FOR EMAIL DELIVERY")
-    print(f"   From: {DEFAULT_FROM_EMAIL}")
-    print(f"   To test, use: {EMAIL_HOST_USER.split('@')[0]}+test1@gmail.com")
+    if is_render:
+        print("✅ RENDER: GMAIL SMTP CONFIGURED")
+    else:
+        print("✅ LOCAL: GMAIL SMTP CONFIGURED")
 else:
-    # DEVELOPMENT: Console backend (for testing without real emails)
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-    DEFAULT_FROM_EMAIL = 'TrackWise <noreply@trackwise.com>'
-    SERVER_EMAIL = 'TrackWise <noreply@trackwise.com>'
-    
-    print("📧 USING CONSOLE EMAIL - Emails shown in terminal")
-    print("💡 To send real emails, set in .env:")
-    print("   EMAIL_HOST_USER=cararagtrisharaye@gmail.com")
-    print("   EMAIL_HOST_PASSWORD=your-16-digit-app-password")
-
-# Note: No MEDIA settings needed since images are stored as BLOB in database
-print("✅ USING DATABASE BLOB STORAGE FOR IMAGES")
+    # No credentials - use appropriate backend
+    if DEBUG and not is_render:
+        EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+        print("📧 LOCAL DEV: CONSOLE EMAIL BACKEND")
+    else:
+        EMAIL_BACKEND = 'django.core.mail.backends.dummy.EmailBackend'
+        print("⚠️ PRODUCTION: NO EMAIL CREDENTIALS - Using dummy backend")
 
 # Custom user model
 AUTH_USER_MODEL = 'auth.User'
